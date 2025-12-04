@@ -22,7 +22,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
 
 <script>
-const URL = "http://127.0.0.1:5500/my_model/";
+// IMPORTANT: Use a RELATIVE path for GitHub Pages
+const URL = "./my_model/";
 
 function toggleLight(force) {
   const themeLink = document.getElementById('theme');
@@ -37,7 +38,6 @@ function toggleLight(force) {
   }
 }
 
-// --- Teachable Machine Imp.
 async function createModel() {
   const checkpointURL = URL + "model.json";
   const metadataURL = URL + "metadata.json";
@@ -67,32 +67,33 @@ async function init() {
     labelContainer.appendChild(document.createElement("div"));
   }
 
-  recognizer.listen(result => {
-    const scores = result.scores;
+  recognizer.listen(
+    result => {
+      const scores = result.scores;
 
-    for (let i = 0; i < classLabels.length; i++) {
-      labelContainer.childNodes[i].innerHTML = classLabels[i] + ": " + scores[i].toFixed(2);
-    }
-
-    const maxScore = Math.max(...scores);
-    const maxIndex = scores.indexOf(maxScore);
-
-    if (maxScore > 0.75) {
-      const detected = classLabels[maxIndex].toLowerCase();
-      console.log("Detected:", detected);
-
-      if (detected.includes("on")) {
-        toggleLight('on');
-      } else if (detected.includes("off")) {
-        toggleLight('off');
+      for (let i = 0; i < classLabels.length; i++) {
+        labelContainer.childNodes[i].innerHTML =
+          classLabels[i] + ": " + scores[i].toFixed(2);
       }
+
+      const maxScore = Math.max(...scores);
+      const maxIndex = scores.indexOf(maxScore);
+
+      if (maxScore > 0.75) {
+        const detected = classLabels[maxIndex].toLowerCase();
+        console.log("Detected:", detected);
+
+        if (detected.includes("on")) toggleLight('on');
+        if (detected.includes("off")) toggleLight('off');
+      }
+    },
+    {
+      includeSpectrogram: false,
+      probabilityThreshold: 0.75,
+      invokeCallbackOnNoiseAndUnknown: false,
+      overlapFactor: 0.5
     }
-  }, {
-    includeSpectrogram: false,
-    probabilityThreshold: 0.75,
-    invokeCallbackOnNoiseAndUnknown: false,
-    overlapFactor: 0.5
-  });
+  );
 }
 </script>
 
