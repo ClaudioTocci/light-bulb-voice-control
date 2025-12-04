@@ -5,95 +5,93 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Light Bulb + Teachable Machine</title>
 <link id="theme" rel="stylesheet" href="light-off.css" />
+<style>
+  .container { text-align: center; margin-top: 40px; }
+  .bulb { width: 150px; height: 150px; margin: 0 auto 20px; background-size: cover; cursor: pointer; }
+</style>
 </head>
 <body>
 
 <div class="container">
   <div class="bulb" onclick="toggleLight()"></div>
-  <p>Click the bulb to toggle, or say <strong>on/off</strong></p>
+  <p>Click the bulb or say: <strong>on</strong> / <strong>off</strong></p>
 
-  <div>
-    <button onclick="init()">🎤 Start Listening</button>
-  </div>
+  <button onclick="init()">🎤 Start Listening</button>
+
   <div id="label-container"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
+<!-- Correct libraries for Teachable Machine AUDIO -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound@latest"></script>
 
 <script>
-// IMPORTANT: Use a RELATIVE path for GitHub Pages
+// CORRECT MODEL PATH FOR GITHUB PAGES
 const URL = "./my_model/";
 
+let model, maxPredictions, labelContainer;
+
+// Toggle bulb on/off
 function toggleLight(force) {
-  const themeLink = document.getElementById('theme');
-  const href = themeLink.getAttribute('href');
+  const theme = document.getElementById("theme");
+  const current = theme.getAttribute("href");
 
-  if (force === 'on') {
-    themeLink.setAttribute('href', 'light-on.css');
-  } else if (force === 'off') {
-    themeLink.setAttribute('href', 'light-off.css');
+  if (force === "on") {
+    theme.setAttribute("href", "light-on.css");
+  } else if (force === "off") {
+    theme.setAttribute("href", "light-off.css");
   } else {
-    themeLink.setAttribute('href', href === 'light-off.css' ? 'light-on.css' : 'light-off.css');
+    theme.setAttribute("href", current === "light-off.css" ? "light-on.css" : "light-off.css");
   }
-}
-
-async function createModel() {
-  const checkpointURL = URL + "model.json";
-  const metadataURL = URL + "metadata.json";
-
-  const recognizer = speechCommands.create(
-    "BROWSER_FFT",
-    undefined,
-    checkpointURL,
-    metadataURL
-  );
-
-  await recognizer.ensureModelLoaded();
-  return recognizer;
 }
 
 async function init() {
-  console.log("init() called");
+  console.log("Loading model...");
 
-  const recognizer = await createModel();
-  console.log("Model loaded");
+  const modelURL = URL + "model.json";
+  const metadataURL = URL + "metadata.json";
 
-  const classLabels = recognizer.wordLabels();
-  const labelContainer = document.getElementById("label-container");
+  model = await tmSound.load(modelURL, metadataURL);
+  maxPredictions = model.getClassLabels().length;
+
+  console.log("Model loaded!");
+
+  // Prepare label container
+  labelContainer = document.getElementById("label-container");
   labelContainer.innerHTML = "";
-
-  for (let i = 0; i < classLabels.length; i++) {
+  for (let i = 0; i < maxPredictions; i++) {
     labelContainer.appendChild(document.createElement("div"));
   }
 
-  recognizer.listen(
-    result => {
-      const scores = result.scores;
+  listen();
+}
 
-      for (let i = 0; i < classLabels.length; i++) {
-        labelContainer.childNodes[i].innerHTML =
-          classLabels[i] + ": " + scores[i].toFixed(2);
+function listen() {
+  model.listen(result => {
+    let highestProb = 0;
+    let highestIndex = 0;
+
+    // Display prediction scores
+    for (let i = 0; i < maxPredictions; i++) {
+      const score = result.scores[i];
+      labelContainer.childNodes[i].innerHTML =
+        model.getClassLabels()[i] + ": " + score.toFixed(2);
+
+      if (score > highestProb) {
+        highestProb = score;
+        highestIndex = i;
       }
-
-      const maxScore = Math.max(...scores);
-      const maxIndex = scores.indexOf(maxScore);
-
-      if (maxScore > 0.75) {
-        const detected = classLabels[maxIndex].toLowerCase();
-        console.log("Detected:", detected);
-
-        if (detected.includes("on")) toggleLight('on');
-        if (detected.includes("off")) toggleLight('off');
-      }
-    },
-    {
-      includeSpectrogram: false,
-      probabilityThreshold: 0.75,
-      invokeCallbackOnNoiseAndUnknown: false,
-      overlapFactor: 0.5
     }
-  );
+
+    // Detect on/off
+    if (highestProb > 0.75) {
+      const detected = model.getClassLabels()[highestIndex].toLowerCase();
+      console.log("Detected:", detected);
+
+      if (detected.includes("on")) toggleLight("on");
+      if (detected.includes("off")) toggleLight("off");
+    }
+  });
 }
 </script>
 
