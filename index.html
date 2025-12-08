@@ -3,95 +3,132 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Light Bulb + Teachable Machine</title>
+<title>Light Bulb + Voice Control</title>
+
+<!-- Start with OFF theme -->
 <link id="theme" rel="stylesheet" href="light-off.css" />
+
 <style>
-  .container { text-align: center; margin-top: 40px; }
-  .bulb { width: 150px; height: 150px; margin: 0 auto 20px; background-size: cover; cursor: pointer; }
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin-top: 40px;
+        background: #111;
+        color: white;
+    }
+
+    .bulb {
+        width: 150px;
+        height: 150px;
+        margin: 20px auto;
+        background-image: url('https://i.imgur.com/6VQeYyH.png'); /* optional icon */
+        background-size: cover;
+        cursor: pointer;
+    }
+
+    button {
+        padding: 12px 20px;
+        font-size: 18px;
+        margin-top: 10px;
+        cursor: pointer;
+    }
+
+    #label-container div {
+        margin-top: 6px;
+        font-size: 16px;
+    }
 </style>
 </head>
 <body>
 
-<div class="container">
-  <div class="bulb" onclick="toggleLight()"></div>
-  <p>Click the bulb or say: <strong>on</strong> / <strong>off</strong></p>
+<h1>Voice Controlled Light Bulb</h1>
+<p>Say <strong>“on”</strong> or <strong>“off”</strong> to control the bulb</p>
 
-  <button onclick="init()">🎤 Start Listening</button>
+<div class="bulb" onclick="toggleLight()"></div>
 
-  <div id="label-container"></div>
-</div>
+<button onclick="init()">🎤 Start Listening</button>
 
-<!-- Correct libraries for Teachable Machine AUDIO -->
+<div id="label-container"></div>
+
+<!-- Correct Teachable Machine libraries -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound@latest"></script>
 
 <script>
-// CORRECT MODEL PATH FOR GITHUB PAGES
+// Correct model path for GitHub Pages
 const URL = "./my_model/";
 
-let model, maxPredictions, labelContainer;
+let model, maxPredictions;
+let labelContainer = document.getElementById("label-container");
 
-// Toggle bulb on/off
+// Toggle CSS file between light-on and light-off
 function toggleLight(force) {
-  const theme = document.getElementById("theme");
-  const current = theme.getAttribute("href");
+    const theme = document.getElementById("theme");
+    const current = theme.getAttribute("href");
 
-  if (force === "on") {
-    theme.setAttribute("href", "light-on.css");
-  } else if (force === "off") {
-    theme.setAttribute("href", "light-off.css");
-  } else {
-    theme.setAttribute("href", current === "light-off.css" ? "light-on.css" : "light-off.css");
-  }
+    if (force === "on") {
+        theme.setAttribute("href", "light-on.css");
+    } else if (force === "off") {
+        theme.setAttribute("href", "light-off.css");
+    } else {
+        theme.setAttribute("href",
+            current === "light-off.css" ? "light-on.css" : "light-off.css"
+        );
+    }
 }
 
 async function init() {
-  console.log("Loading model...");
+    console.log("Loading model...");
 
-  const modelURL = URL + "model.json";
-  const metadataURL = URL + "metadata.json";
+    const modelURL = URL + "model.json";
+    const metadataURL = URL + "metadata.json";
 
-  model = await tmSound.load(modelURL, metadataURL);
-  maxPredictions = model.getClassLabels().length;
+    // Load model
+    model = await tmSound.load(modelURL, metadataURL);
+    maxPredictions = model.getClassLabels().length;
 
-  console.log("Model loaded!");
+    console.log("Model loaded!");
 
-  // Prepare label container
-  labelContainer = document.getElementById("label-container");
-  labelContainer.innerHTML = "";
-  for (let i = 0; i < maxPredictions; i++) {
-    labelContainer.appendChild(document.createElement("div"));
-  }
+    // Prepare output elements
+    labelContainer.innerHTML = "";
+    for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+    }
 
-  listen();
+    listen();
 }
 
 function listen() {
-  model.listen(result => {
-    let highestProb = 0;
-    let highestIndex = 0;
+    model.listen(
+        result => {
+            let highestProb = 0;
+            let highestIndex = 0;
 
-    // Display prediction scores
-    for (let i = 0; i < maxPredictions; i++) {
-      const score = result.scores[i];
-      labelContainer.childNodes[i].innerHTML =
-        model.getClassLabels()[i] + ": " + score.toFixed(2);
+            for (let i = 0; i < maxPredictions; i++) {
+                const score = result.scores[i];
+                labelContainer.childNodes[i].innerHTML =
+                    model.getClassLabels()[i] + ": " + score.toFixed(2);
 
-      if (score > highestProb) {
-        highestProb = score;
-        highestIndex = i;
-      }
-    }
+                if (score > highestProb) {
+                    highestProb = score;
+                    highestIndex = i;
+                }
+            }
 
-    // Detect on/off
-    if (highestProb > 0.75) {
-      const detected = model.getClassLabels()[highestIndex].toLowerCase();
-      console.log("Detected:", detected);
+            // Action threshold
+            if (highestProb > 0.75) {
+                const detected = model.getClassLabels()[highestIndex].toLowerCase();
 
-      if (detected.includes("on")) toggleLight("on");
-      if (detected.includes("off")) toggleLight("off");
-    }
-  });
+                console.log("Detected:", detected);
+
+                if (detected.includes("on")) toggleLight("on");
+                if (detected.includes("off")) toggleLight("off");
+            }
+        },
+        {
+            overlapFactor: 0.5,
+        }
+    );
 }
 </script>
 
