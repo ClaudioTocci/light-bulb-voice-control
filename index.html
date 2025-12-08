@@ -3,137 +3,96 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Light Bulb + Voice Control</title>
-
-<!-- Start OFF mode -->
+<title>Light Bulb + Teachable Machine</title>
 <link id="theme" rel="stylesheet" href="light-off.css" />
-
-<style>
-    body {
-        background: #000;
-        color: #fff;
-        font-family: Arial, sans-serif;
-        text-align: center;
-        margin-top: 40px;
-    }
-
-    .bulb {
-        width: 150px;
-        height: 150px;
-        margin: 20px auto;
-        background: gray;
-        border-radius: 50%;
-        cursor: pointer;
-    }
-
-    button {
-        padding: 12px 20px;
-        font-size: 18px;
-        cursor: pointer;
-        margin-top: 10px;
-    }
-
-    #label-container div {
-        margin-top: 6px;
-        font-size: 16px;
-    }
-</style>
 </head>
 <body>
 
-<h1>Voice Controlled Light Bulb</h1>
-<p>Say <strong>on</strong> or <strong>off</strong> to control the bulb.</p>
+<div class="container">
+  <div class="bulb" onclick="toggleLight()"></div>
+  <p>Click the bulb to toggle, or say <strong>on/off</strong></p>
 
-<div class="bulb" onclick="toggleLight()"></div>
+  <div>
+    <button onclick="init()">🎤 Start Listening</button>
+  </div>
+  <div id="label-container"></div>
+</div>
 
-<button onclick="init()">🎤 Start Listening</button>
-
-<div id="label-container"></div>
-
-<!-- TensorFlow.js + SpeechCommands (the correct library for sound models) -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
 
 <script>
-// Path to your Teachable Machine sound model
-const URL = "./my_model/";
+const URL = "http://127.0.0.1:5500/my_model/";
 
-let recognizer;
-
-// Toggle bulb by swapping CSS
 function toggleLight(force) {
-    const theme = document.getElementById("theme");
-    const current = theme.getAttribute("href");
+  const themeLink = document.getElementById('theme');
+  const href = themeLink.getAttribute('href');
 
-    if (force === "on") {
-        theme.setAttribute("href", "light-on.css");
-    } else if (force === "off") {
-        theme.setAttribute("href", "light-off.css");
-    } else {
-        theme.setAttribute("href", current === "light-off.css" ? "light-on.css" : "light-off.css");
-    }
+  if (force === 'on') {
+    themeLink.setAttribute('href', 'light-on.css');
+  } else if (force === 'off') {
+    themeLink.setAttribute('href', 'light-off.css');
+  } else {
+    themeLink.setAttribute('href', href === 'light-off.css' ? 'light-on.css' : 'light-off.css');
+  }
 }
 
-async function createRecognizer() {
-    const checkpointURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
+// --- Teachable Machine Imp.
+async function createModel() {
+  const checkpointURL = URL + "model.json";
+  const metadataURL = URL + "metadata.json";
 
-    const recognizer = speechCommands.create(
-        "BROWSER_FFT",
-        undefined,
-        checkpointURL,
-        metadataURL
-    );
+  const recognizer = speechCommands.create(
+    "BROWSER_FFT",
+    undefined,
+    checkpointURL,
+    metadataURL
+  );
 
-    console.log("Loading model...");
-    await recognizer.ensureModelLoaded();
-    console.log("Model loaded!");
-
-    return recognizer;
+  await recognizer.ensureModelLoaded();
+  return recognizer;
 }
 
 async function init() {
-    const labelContainer = document.getElementById("label-container");
-    labelContainer.innerHTML = "";
+  console.log("init() called");
 
-    recognizer = await createRecognizer();
-    const labels = recognizer.wordLabels();
+  const recognizer = await createModel();
+  console.log("Model loaded");
 
-    labels.forEach(() => labelContainer.appendChild(document.createElement("div")));
+  const classLabels = recognizer.wordLabels();
+  const labelContainer = document.getElementById("label-container");
+  labelContainer.innerHTML = "";
 
-    recognizer.listen(
-        result => {
-            const scores = result.scores;
-            let highestIndex = 0;
-            let highestScore = 0;
+  for (let i = 0; i < classLabels.length; i++) {
+    labelContainer.appendChild(document.createElement("div"));
+  }
 
-            // Display all class scores
-            scores.forEach((score, i) => {
-                labelContainer.childNodes[i].innerHTML =
-                    labels[i] + ": " + score.toFixed(2);
+  recognizer.listen(result => {
+    const scores = result.scores;
 
-                if (score > highestScore) {
-                    highestScore = score;
-                    highestIndex = i;
-                }
-            });
+    for (let i = 0; i < classLabels.length; i++) {
+      labelContainer.childNodes[i].innerHTML = classLabels[i] + ": " + scores[i].toFixed(2);
+    }
 
-            // Voice detection logic
-            if (highestScore > 0.75) {
-                const detected = labels[highestIndex].toLowerCase();
-                console.log("Detected:", detected);
+    const maxScore = Math.max(...scores);
+    const maxIndex = scores.indexOf(maxScore);
 
-                if (detected.includes("on")) toggleLight("on");
-                if (detected.includes("off")) toggleLight("off");
-            }
-        },
-        {
-            probabilityThreshold: 0.75,
-            includeSpectrogram: false,
-            invokeCallbackOnNoiseAndUnknown: false,
-            overlapFactor: 0.5
-        }
-    );
+    if (maxScore > 0.75) {
+      const detected = classLabels[maxIndex].toLowerCase();
+      console.log("Detected:", detected);
+
+      if (detected.includes("on")) {
+        toggleLight('on');
+      } else if (detected.includes("off")) {
+        toggleLight('off');
+      }
+    }
+  }, {
+    includeSpectrogram: false,
+    probabilityThreshold: 0.75,
+    invokeCallbackOnNoiseAndUnknown: false,
+    overlapFactor: 0.5
+  });
 }
 </script>
 
