@@ -1,60 +1,140 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Teachable Machine Image Model</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Light Bulb + Voice Control</title>
+
+<!-- Start OFF mode -->
+<link id="theme" rel="stylesheet" href="light-off.css" />
+
+<style>
+    body {
+        background: #000;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin-top: 40px;
+    }
+
+    .bulb {
+        width: 150px;
+        height: 150px;
+        margin: 20px auto;
+        background: gray;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    button {
+        padding: 12px 20px;
+        font-size: 18px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    #label-container div {
+        margin-top: 6px;
+        font-size: 16px;
+    }
+</style>
 </head>
+<body>
 
-<body style="text-align:center; font-family:sans-serif; background:#111; color:white;">
-  <h1>Teachable Machine Image Model Demo</h1>
-  <p>This model was trained in Teachable Machine and is hosted on GitHub Pages.</p>
+<h1>Voice Controlled Light Bulb</h1>
+<p>Say <strong>on</strong> or <strong>off</strong> to control the bulb.</p>
 
-  <button onclick="init()">Start Webcam + Model</button>
+<div class="bulb" onclick="toggleLight()"></div>
 
-  <div><canvas id="canvas"></canvas></div>
-  <div id="label-container"></div>
+<button onclick="init()">🎤 Start Listening</button>
 
-<script type="text/javascript">
-  const URL = "./my_model_image/"; // rename folder if needed
+<div id="label-container"></div>
 
-  let model, webcam, labelContainer, maxPredictions;
+<!-- TensorFlow.js + SpeechCommands (the correct library for sound models) -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@latest"></script>
 
-  async function init() {
-      const modelURL = URL + "model.json";
-      const metadataURL = URL + "metadata.json";
+<script>
+// Path to your Teachable Machine sound model
+const URL = "./my_model/";
 
-      model = await tmImage.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
+let recognizer;
 
-      const flip = true;
-      webcam = new tmImage.Webcam(200, 200, flip);
-      await webcam.setup();
-      await webcam.play();
-      window.requestAnimationFrame(loop);
+// Toggle bulb by swapping CSS
+function toggleLight(force) {
+    const theme = document.getElementById("theme");
+    const current = theme.getAttribute("href");
 
-      document.body.appendChild(webcam.canvas);
+    if (force === "on") {
+        theme.setAttribute("href", "light-on.css");
+    } else if (force === "off") {
+        theme.setAttribute("href", "light-off.css");
+    } else {
+        theme.setAttribute("href", current === "light-off.css" ? "light-on.css" : "light-off.css");
+    }
+}
 
-      labelContainer = document.getElementById("label-container");
-      for (let i = 0; i < maxPredictions; i++) {
-          labelContainer.appendChild(document.createElement("div"));
-      }
-  }
+async function createRecognizer() {
+    const checkpointURL = URL + "model.json";
+    const metadataURL = URL + "metadata.json";
 
-  async function loop() {
-      webcam.update();
-      await predict();
-      window.requestAnimationFrame(loop);
-  }
+    const recognizer = speechCommands.create(
+        "BROWSER_FFT",
+        undefined,
+        checkpointURL,
+        metadataURL
+    );
 
-  async function predict() {
-      const prediction = await model.predict(webcam.canvas);
-      for (let i = 0; i < maxPredictions; i++) {
-          labelContainer.childNodes[i].innerHTML =
-              prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-      }
-  }
+    console.log("Loading model...");
+    await recognizer.ensureModelLoaded();
+    console.log("Model loaded!");
+
+    return recognizer;
+}
+
+async function init() {
+    const labelContainer = document.getElementById("label-container");
+    labelContainer.innerHTML = "";
+
+    recognizer = await createRecognizer();
+    const labels = recognizer.wordLabels();
+
+    labels.forEach(() => labelContainer.appendChild(document.createElement("div")));
+
+    recognizer.listen(
+        result => {
+            const scores = result.scores;
+            let highestIndex = 0;
+            let highestScore = 0;
+
+            // Display all class scores
+            scores.forEach((score, i) => {
+                labelContainer.childNodes[i].innerHTML =
+                    labels[i] + ": " + score.toFixed(2);
+
+                if (score > highestScore) {
+                    highestScore = score;
+                    highestIndex = i;
+                }
+            });
+
+            // Voice detection logic
+            if (highestScore > 0.75) {
+                const detected = labels[highestIndex].toLowerCase();
+                console.log("Detected:", detected);
+
+                if (detected.includes("on")) toggleLight("on");
+                if (detected.includes("off")) toggleLight("off");
+            }
+        },
+        {
+            probabilityThreshold: 0.75,
+            includeSpectrogram: false,
+            invokeCallbackOnNoiseAndUnknown: false,
+            overlapFactor: 0.5
+        }
+    );
+}
 </script>
 
 </body>
