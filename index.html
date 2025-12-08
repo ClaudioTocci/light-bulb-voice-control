@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Light Bulb + Voice Control</title>
 
-<!-- Start OFF mode -->
 <link id="theme" rel="stylesheet" href="light-off.css" />
 
 <style>
@@ -50,18 +49,18 @@
 
 <div id="label-container"></div>
 
-<!-- Correct libraries for Teachable Machine audio -->
+<!-- TensorFlow.js -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-<script src="https://storage.googleapis.com/teachable-machine-library/sound/v0.8.4/teachablemachine-sound.min.js"></script>
+
+<!-- THE ONLY WORKING TEACHABLE MACHINE SOUND LIBRARY -->
+<script src="https://cdn.jsdelivr.net/gh/googlecreativelab/teachablemachine-node@master/dist/teachablemachine-sound.min.js"></script>
 
 <script>
-// Model folder for GitHub Pages
 const URL = "./my_model/";
 
 let model, maxPredictions;
 let labelContainer = document.getElementById("label-container");
 
-// Toggle light bulb on/off by CSS file swap
 function toggleLight(force) {
     const theme = document.getElementById("theme");
     const current = theme.getAttribute("href");
@@ -83,13 +82,11 @@ async function init() {
     const modelURL = URL + "model.json";
     const metadataURL = URL + "metadata.json";
 
-    // Load the Teachable Machine sound model
     model = await tmSound.load(modelURL, metadataURL);
     maxPredictions = model.getClassLabels().length;
 
     console.log("Model loaded!");
 
-    // Prepare prediction label elements
     labelContainer.innerHTML = "";
     for (let i = 0; i < maxPredictions; i++) {
         labelContainer.appendChild(document.createElement("div"));
@@ -99,37 +96,28 @@ async function init() {
 }
 
 function listen() {
-    model.listen(
-        result => {
-            let highestProb = 0;
-            let highestIndex = 0;
+    model.listen(result => {
+        let highestProb = 0;
+        let highestIndex = 0;
 
-            // Display prediction values
-            for (let i = 0; i < maxPredictions; i++) {
-                const score = result.scores[i];
-                labelContainer.childNodes[i].innerHTML =
-                    model.getClassLabels()[i] + ": " + score.toFixed(2);
+        for (let i = 0; i < maxPredictions; i++) {
+            const score = result.scores[i];
+            labelContainer.childNodes[i].innerHTML =
+                model.getClassLabels()[i] + ": " + score.toFixed(2);
 
-                if (score > highestProb) {
-                    highestProb = score;
-                    highestIndex = i;
-                }
+            if (score > highestProb) {
+                highestProb = score;
+                highestIndex = i;
             }
-
-            // Trigger on/off action
-            if (highestProb > 0.75) {
-                const detected = model.getClassLabels()[highestIndex].toLowerCase();
-
-                console.log("Detected:", detected);
-
-                if (detected.includes("on")) toggleLight("on");
-                if (detected.includes("off")) toggleLight("off");
-            }
-        },
-        {
-            overlapFactor: 0.5,
         }
-    );
+
+        if (highestProb > 0.75) {
+            const detected = model.getClassLabels()[highestIndex].toLowerCase();
+
+            if (detected.includes("on")) toggleLight("on");
+            if (detected.includes("off")) toggleLight("off");
+        }
+    });
 }
 </script>
 
