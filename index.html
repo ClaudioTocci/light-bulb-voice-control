@@ -5,32 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Light Bulb + Voice Control</title>
 
-<!-- Start with OFF theme -->
+<!-- Start OFF mode -->
 <link id="theme" rel="stylesheet" href="light-off.css" />
 
 <style>
     body {
+        background: #000;
+        color: #fff;
         font-family: Arial, sans-serif;
         text-align: center;
         margin-top: 40px;
-        background: #111;
-        color: white;
     }
 
     .bulb {
         width: 150px;
         height: 150px;
         margin: 20px auto;
-        background-image: url('https://i.imgur.com/6VQeYyH.png'); /* optional icon */
-        background-size: cover;
+        background: gray;
+        border-radius: 50%;
         cursor: pointer;
     }
 
     button {
         padding: 12px 20px;
         font-size: 18px;
-        margin-top: 10px;
         cursor: pointer;
+        margin-top: 10px;
     }
 
     #label-container div {
@@ -42,7 +42,7 @@
 <body>
 
 <h1>Voice Controlled Light Bulb</h1>
-<p>Say <strong>“on”</strong> or <strong>“off”</strong> to control the bulb</p>
+<p>Say <strong>on</strong> or <strong>off</strong> to control the bulb.</p>
 
 <div class="bulb" onclick="toggleLight()"></div>
 
@@ -50,18 +50,18 @@
 
 <div id="label-container"></div>
 
-<!-- Correct Teachable Machine libraries -->
+<!-- Correct libraries for Teachable Machine audio -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound@latest"></script>
+<script src="https://storage.googleapis.com/teachable-machine-library/sound/v0.8.4/teachablemachine-sound.min.js"></script>
 
 <script>
-// Correct model path for GitHub Pages
+// Model folder for GitHub Pages
 const URL = "./my_model/";
 
 let model, maxPredictions;
 let labelContainer = document.getElementById("label-container");
 
-// Toggle CSS file between light-on and light-off
+// Toggle light bulb on/off by CSS file swap
 function toggleLight(force) {
     const theme = document.getElementById("theme");
     const current = theme.getAttribute("href");
@@ -83,13 +83,13 @@ async function init() {
     const modelURL = URL + "model.json";
     const metadataURL = URL + "metadata.json";
 
-    // Load model
+    // Load the Teachable Machine sound model
     model = await tmSound.load(modelURL, metadataURL);
     maxPredictions = model.getClassLabels().length;
 
     console.log("Model loaded!");
 
-    // Prepare output elements
+    // Prepare prediction label elements
     labelContainer.innerHTML = "";
     for (let i = 0; i < maxPredictions; i++) {
         labelContainer.appendChild(document.createElement("div"));
@@ -104,6 +104,7 @@ function listen() {
             let highestProb = 0;
             let highestIndex = 0;
 
+            // Display prediction values
             for (let i = 0; i < maxPredictions; i++) {
                 const score = result.scores[i];
                 labelContainer.childNodes[i].innerHTML =
@@ -115,7 +116,7 @@ function listen() {
                 }
             }
 
-            // Action threshold
+            // Trigger on/off action
             if (highestProb > 0.75) {
                 const detected = model.getClassLabels()[highestIndex].toLowerCase();
 
